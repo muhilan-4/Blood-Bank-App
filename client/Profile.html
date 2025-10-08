@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Profile • BloodLink</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    body{background:#f7f7f9}
+    .card{border:0;box-shadow:0 12px 32px rgba(0,0,0,.08)}
+    .settings{position:absolute; top:16px; right:16px; cursor:pointer}
+    .circle-btn{
+      width:180px;height:180px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:1.1rem;
+      background:#dc3545;color:#fff;border:none;
+      box-shadow:0 16px 40px rgba(220,53,69,.4), 0 2px 6px rgba(0,0,0,.15);
+      transition: transform .08s ease;
+    }
+    .circle-btn:active{ transform: scale(.98); }
+    .tag{display:inline-block;padding:.2rem .5rem;border-radius:999px;background:#fee;color:#b20000;font-weight:600}
+    .muted{color:#6c757d}
+  </style>
+</head>
+<body class="py-5">
+  <div class="container" style="max-width:900px">
+    <div class="mb-3"><a class="btn btn-outline-secondary btn-sm" href="/welcome">← Back to Welcome</a></div>
+
+    <div class="card p-4 position-relative">
+      <i id="gear" class="bi bi-gear settings fs-4" title="Edit settings"></i>
+      <h3 class="mb-1">My Profile</h3>
+      <div id="profile" class="mt-3"></div>
+
+      <form id="editForm" class="row g-3 mt-2" style="display:none">
+        <div class="col-md-6"><label class="form-label">Full Name</label><input class="form-control" name="name" /></div>
+        <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone" /></div>
+        <div class="col-md-6">
+          <label class="form-label">Blood Group</label>
+          <select class="form-select" name="bloodGroup">
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Address</label>
+          <textarea class="form-control" name="address" rows="2"></textarea>
+          <div class="form-text">Format: House no, Street, Area, City PIN, State, India</div>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+          <button class="btn btn-outline-secondary" type="button" id="cancelBtn">Cancel</button>
+          <button class="btn btn-primary" type="submit">Save Changes</button>
+        </div>
+        <div id="editMsg"></div>
+      </form>
+
+      <div class="mt-4 d-flex flex-column flex-md-row align-items-center gap-4">
+        <button id="nearestBtn" class="circle-btn">Search Nearest Donor</button>
+        <div id="nearestResult" class="flex-grow-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api";
+    const userId = localStorage.getItem("userId");
+    if (!userId) window.location.href = "/login";
+
+    const profileDiv = document.getElementById("profile");
+    const editForm = document.getElementById("editForm");
+    const gear = document.getElementById("gear");
+    const cancelBtn = document.getElementById("cancelBtn");
+    const nearestBtn = document.getElementById("nearestBtn");
+    const nearestResult = document.getElementById("nearestResult");
+    let me = null;
+
+    function renderProfile() {
+      profileDiv.innerHTML = `
+        <div class="row">
+          <div class="col-md-7">
+            <div><strong>Name:</strong> ${me.name}</div>
+            <div><strong>Email:</strong> ${me.email}</div>
+            <div><strong>Phone:</strong> ${me.phone || '<span class="muted">—</span>'}</div>
+            <div><strong>Address:</strong> ${me.addressNormalized || me.addressRaw}</div>
+          </div>
+          <div class="col-md-5">
+            <div><strong>Blood Group:</strong> <span class="tag">${me.bloodGroup}</span></div>
+            <div class="mt-2"><span class="muted">Last updated:</span> ${new Date(me.updatedAt).toLocaleString()}</div>
+          </div>
+        </div>
+      `;
+    }
+    async function loadMe() {
+      const res = await fetch(`${API}/users/${userId}`);
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Failed to load profile"); return; }
+      me = data.user; renderProfile();
+      editForm.name.value = me.name || "";
+      editForm.phone.value = me.phone || "";
+      editForm.bloodGroup.value = me.bloodGroup || "O+";
+      editForm.address.value = me.addressRaw || me.addressNormalized || "";
+    }
+    gear.addEventListener("click", () => { editForm.style.display = editForm.style.display === "none" ? "block" : "none"; });
+    cancelBtn.addEventListener("click", () => {
+      editForm.style.display = "none";
+      editForm.name.value = me.name || "";
+      editForm.phone.value = me.phone || "";
+      editForm.bloodGroup.value = me.bloodGroup || "O+";
+      editForm.address.value = me.addressRaw || me.addressNormalized || "";
+    });
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(editForm);
+      const payload = Object.fromEntries(fd.entries());
+      const res = await fetch(`${API}/users/${userId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) { document.getElementById("editMsg").innerHTML = `<div class="alert alert-danger mt-2">${data.error||'Update failed'}</div>`; return; }
+      me = data.user; renderProfile();
+      document.getElementById("editMsg").innerHTML = `<div class="alert alert-success mt-2">Profile updated</div>`;
+      setTimeout(() => { editForm.style.display = "none"; document.getElementById("editMsg").innerHTML = ""; }, 700);
+    });
+    nearestBtn.addEventListener("click", async () => {
+      nearestBtn.disabled = true; nearestBtn.textContent = "Searching…";
+      try {
+        const res = await fetch(`${API}/nearest?userId=${encodeURIComponent(userId)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        if (!data.nearest) nearestResult.innerHTML = `<div class="alert alert-warning">No compatible donors found yet.</div>`;
+        else nearestResult.innerHTML = `
+          <div class="alert alert-success">
+            <div><strong>Nearest Donor:</strong> ${data.nearest.name} <span class="tag">${data.nearest.bloodGroup}</span></div>
+            <div><strong>Distance:</strong> ${data.nearest.km} km</div>
+            <div><strong>Address:</strong> ${data.nearest.address}</div>
+          </div>`;
+      } catch (e) {
+        nearestResult.innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+      } finally {
+        nearestBtn.disabled = false; nearestBtn.textContent = "Search Nearest Donor";
+      }
+    });
+    loadMe();
+  </script>
+</body>
+</html>

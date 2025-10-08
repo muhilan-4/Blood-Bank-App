@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register • BloodLink</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body{background:#fafafa}
+    .card{border:0;box-shadow:0 12px 32px rgba(0,0,0,.08)}
+    .btn-pill{border-radius:999px}
+  </style>
+</head>
+<body class="py-5">
+  <div class="container" style="max-width:900px">
+    <div class="card p-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <h3 class="mb-0">Become a Donor</h3>
+        <a class="btn btn-outline-secondary btn-sm" href="/login">Back to Login</a>
+      </div>
+
+      <form id="regForm" class="row g-3 mt-2">
+        <div class="col-md-6">
+          <label class="form-label">Full Name</label>
+          <input class="form-control" name="name" required />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-control" name="email" required />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-control" name="password" required />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Phone</label>
+          <input class="form-control" name="phone" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Blood Group</label>
+          <select class="form-select" name="bloodGroup" required>
+            <option value="">Select…</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+
+        <!-- Address (split fields) -->
+        <div class="col-md-3">
+          <label class="form-label">Door No.</label>
+          <input class="form-control" name="doorNo" placeholder="e.g., 1579A" required />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Area / Colony</label>
+          <input class="form-control" name="area" placeholder="AKL Colony" required />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Street / Road</label>
+          <input class="form-control" name="street" placeholder="Medical College Road" required />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">City / Town</label>
+          <input class="form-control" name="city" placeholder="Thanjavur" required />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Pincode</label>
+          <input class="form-control" name="pincode" type="text" inputmode="numeric" autocomplete="postal-code"  placeholder="6xxxx4" pattern="\d{6}" maxlength="6" required />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">State</label>
+          <input class="form-control" name="state" placeholder="Tamil Nadu" required />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Country</label>
+          <input class="form-control" name="country" value="India" required />
+        </div>
+
+        <div class="col-12 d-flex justify-content-end">
+          <button class="btn btn-danger btn-pill px-4" type="submit">Register</button>
+        </div>
+      </form>
+
+      <div id="msg" class="mt-3"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api";
+
+    // Build a clean, normalized address string from parts
+    function buildAddress(parts) {
+      const segs = [];
+
+      const door = parts.doorNo?.trim();
+      const area = parts.area?.trim();
+      const street = parts.street?.trim();
+      const city = parts.city?.trim();
+      const pin = parts.pincode?.trim();
+      const state = parts.state?.trim();
+      const country = parts.country?.trim();
+
+      // specific → general
+      if (door) segs.push(door);
+      if (area) segs.push(area);
+      if (street) segs.push(street);
+
+      // City + PIN as one segment to help geocoders
+      const cityPin = [city, pin].filter(Boolean).join(" ");
+      if (cityPin) segs.push(cityPin);
+
+      if (state) segs.push(state);
+      if (country) segs.push(country || "India");
+
+      // join with commas and tidy up
+      return segs.join(", ")
+        .replace(/\s+/g, " ")
+        .replace(/,\s*,/g, ", ")
+        .trim();
+    }
+
+    const form = document.getElementById("regForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+
+      // Split out user fields and address parts
+      const { name, email, password, phone, bloodGroup,
+              doorNo, area, street, city, pincode, state, country } = payload;
+
+      const addressParts = { doorNo, area, street, city, pincode, state, country };
+      const address = buildAddress(addressParts); // <- single string for server
+
+      try {
+        const res = await fetch(`${API}/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name, email, password, phone, bloodGroup,
+            address,              // server expects a single string
+            addressParts          // (optional extra info for future use)
+          })
+        });
+
+        const data = await res.json();
+        const msg = document.getElementById("msg");
+
+        if (!res.ok) {
+          msg.innerHTML = `<div class="alert alert-danger">${data.error || 'Registration failed'}</div>`;
+          return;
+        }
+        localStorage.setItem("userId", data.user.id);
+        window.location.href = "/welcome";
+      } catch (err) {
+        alert("Network error: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

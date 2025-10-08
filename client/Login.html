@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login • BloodLink</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body{background:#f5f6f8}
+    .card{border:0;box-shadow:0 12px 32px rgba(0,0,0,.08)}
+    .btn-pill{border-radius:999px}
+  </style>
+</head>
+<body class="py-5">
+  <div class="container" style="max-width:520px">
+    <div class="card p-4">
+      <h3 class="mb-1">Welcome back</h3>
+      <p class="text-muted">Log in to continue</p>
+      <form id="loginForm" class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Email</label>
+          <input class="form-control" name="email" type="email" required />
+        </div>
+        <div class="col-12">
+          <label class="form-label">Password</label>
+          <input class="form-control" name="password" type="password" required />
+        </div>
+        <div class="col-12 d-flex justify-content-between align-items-center">
+          <button class="btn btn-dark btn-pill px-4" type="submit">Login</button>
+          <a class="btn btn-outline-danger btn-pill" href="/register">New user? Register</a>
+        </div>
+      </form>
+      <div id="msg" class="mt-3"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = "/api";
+    const form = document.getElementById("loginForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const payload = Object.fromEntries(fd.entries());
+      try {
+        const res = await fetch(`${API}/login`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById("msg").innerHTML = `<div class="alert alert-danger">${data.error||'Failed'}</div>`; return; }
+        localStorage.setItem("userId", data.userId);
+        window.location.href = "/welcome";
+      } catch (err) { alert("Network error: " + err.message); }
+    });
+  </script>
+</body>
+</html>
